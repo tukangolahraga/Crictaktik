@@ -1328,10 +1328,61 @@
                     }
                 }
                 saveData(); 
+                renderTeamTable(); 
+                showToast(`Berhasil menarik ${count} skuad dari Spreadsheet!`);
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        // --- NEW: EXPORT & IMPORT OPPONENT CSV ---
+        function exportOpponentCSV() {
+            if(opponents.length === 0) { showToast("Tidak ada data lawan untuk diekspor"); return; }
+            let csv = "ID,Club,Name,Role,Type,Weaknesses,Tendencies\n";
+            opponents.forEach(o => {
+                let safeClub = `"${(o.club || '').replace(/"/g, '""')}"`;
+                let safeName = `"${(o.name || '').replace(/"/g, '""')}"`;
+                let safeRole = `"${(o.role || '').replace(/"/g, '""')}"`;
+                // Array di join dengan pipeline "|" agar koma tidak merusak struktur CSV
+                let safeWeaknesses = `"${(o.weaknesses || []).join('|')}"`; 
+                let safeTendencies = `"${(o.tendencies || []).join('|')}"`;
+                
+                csv += `${o.id},${safeClub},${safeName},${safeRole},${o.type},${safeWeaknesses},${safeTendencies}\n`;
+            });
+            downloadFile(csv, "CricTactic_Spreadsheet_ScoutingLawan.csv", "text/csv;charset=utf-8;");
+            showToast("Berhasil membackup data Lawan (CSV Spreadsheet).");
+        }
+
+        function importOpponentCSV(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                let count = 0;
+                for(let i=1; i<rows.length; i++) {
+                    if(!rows[i].trim()) continue;
+                    const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || rows[i].split(',');
+                    if(cols.length >= 7) {
+                        opponents.push({
+                            id: Date.now() + i,
+                            club: cols[1].replace(/"/g, '').trim(),
+                            name: cols[2].replace(/"/g, '').trim(),
+                            role: cols[3].replace(/"/g, '').trim(),
+                            type: cols[4].replace(/"/g, '').trim(),
+                            // Split kembali menggunakan pipeline "|"
+                            weaknesses: cols[5].replace(/"/g, '').trim().split('|').filter(w => w), 
+                            tendencies: cols[6].replace(/"/g, '').trim().split('|').filter(t => t)
+                        });
+                        count++;
+                    }
+                }
+                saveData(); 
                 renderOpponents(); 
                 populateMatchupTeamSelect(); 
                 populateMatchupSelect();
-                showToast(`Berhasil menarik ${count} lawan dari Spreadsheet!`);
+                showToast(`Berhasil menarik ${count} data lawan dari Spreadsheet!`);
             };
             reader.readAsText(file);
             event.target.value = ''; // Reset input
