@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CricTactic Analyst PRO</title>
+    <title>CricTactic Analyst</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -141,7 +141,7 @@
                 <i class="fas fa-cricket-bat-ball text-xl"></i>
             </div>
             <div>
-                <h1 class="font-bold text-lg leading-tight">CricTactic PRO</h1>
+                <h1 class="font-bold text-lg leading-tight">CricTactic Analyst</h1>
                 <p class="text-xs text-slate-400">Tactical Match Analyzer</p>
             </div>
         </div>
@@ -472,17 +472,23 @@
                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                      <!-- Matchup Logic -->
                      <div class="glass-card p-6 border-l-4 border-l-purple-500 h-fit">
-                         <h3 class="text-lg font-bold text-slate-700 mb-2">Simulasi Pelempar vs Pemukul</h3>
-                         <p class="text-slate-600 mb-6 text-sm">Pilih pemukul lawan di lapangan. Sistem akan mencari pelempar terbaik berdasarkan statistik riil kita.</p>
+                         <h3 class="text-lg font-bold text-slate-700 mb-2">Simulasi Matchup Tim</h3>
+                         <p class="text-slate-600 mb-6 text-sm">AI akan mencarikan rekomendasi pemain terbaik dari skuad kita (Pemukul / Pelempar) untuk mengatasi strategi lawan.</p>
                          
                          <div class="flex flex-col gap-4">
                              <div class="print:hidden">
+                                 <label class="block text-sm font-semibold text-slate-700 mb-2">Fase Tim Kita:</label>
+                                 <select id="matchup-role-select" class="w-full p-2 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm mb-4 bg-purple-50" onchange="handleMatchupRoleChange()">
+                                     <option value="bowl">Sedang Melempar (Cari Pelempar kita vs Pemukul lawan)</option>
+                                     <option value="bat">Sedang Memukul (Cari Pemukul kita vs Pelempar lawan)</option>
+                                 </select>
+
                                  <label class="block text-sm font-semibold text-slate-700 mb-2">Pilih Tim Lawan:</label>
                                  <select id="matchup-team-select" class="w-full p-2 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm mb-4" onchange="populateMatchupSelect()">
                                      <option value="">-- Pilih Tim Lawan --</option>
                                  </select>
 
-                                 <label class="block text-sm font-semibold text-slate-700 mb-2">Pemukul Lawan di Area Strike:</label>
+                                 <label id="matchup-opp-label" class="block text-sm font-semibold text-slate-700 mb-2">Pemukul Lawan di Area Strike:</label>
                                  <select id="matchup-opp-select" class="w-full p-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm text-lg" onchange="generateMatchup()" disabled>
                                      <option value="">-- Pilih Tim Terlebih Dahulu --</option>
                                  </select>
@@ -707,8 +713,7 @@
                 setTimeout(() => updateChart(), 100); 
             }
             if(tabId === 'matchup') {
-                populateMatchupTeamSelect();
-                populateMatchupSelect();
+                handleMatchupRoleChange();
             }
         }
 
@@ -917,8 +922,7 @@
             document.getElementById('opp-type').dispatchEvent(new Event('change'));
             
             renderOpponents();
-            populateMatchupTeamSelect();
-            populateMatchupSelect();
+            // Optional: update matchup dropdowns if currently in that view
             showToast("Profil Lawan & Taktik disimpan!");
         }
 
@@ -1001,14 +1005,30 @@
         }
 
         // --- MATCHUP & FIELDING LOGIC ---
+        function handleMatchupRoleChange() {
+            const role = document.getElementById('matchup-role-select').value;
+            const oppLabel = document.getElementById('matchup-opp-label');
+            if(role === 'bowl') {
+                oppLabel.innerText = "Pemukul Lawan di Area Strike:";
+            } else {
+                oppLabel.innerText = "Pelempar Lawan yang Aktif:";
+            }
+            populateMatchupTeamSelect();
+            populateMatchupSelect();
+            document.getElementById('matchup-result').innerHTML = '<p class="text-slate-400 text-center text-sm italic">Pilih musuh terlebih dahulu untuk melihat rekomendasi pelatih.</p>';
+        }
+
         function populateMatchupTeamSelect() {
             const sel = document.getElementById('matchup-team-select');
             if(!sel) return;
+            const role = document.getElementById('matchup-role-select') ? document.getElementById('matchup-role-select').value : 'bowl';
             const currentVal = sel.value;
             sel.innerHTML = '<option value="">-- Semua Tim --</option>';
             
-            // Cari nama tim yang unik dari para batter
-            const clubs = [...new Set(opponents.filter(o => o.type === 'batter').map(o => o.club || 'Tanpa Klub'))].sort();
+            const targetOppType = role === 'bowl' ? 'batter' : 'bowler';
+            
+            // Cari nama tim yang unik dari lawan yang sesuai tipe
+            const clubs = [...new Set(opponents.filter(o => o.type === targetOppType).map(o => o.club || 'Tanpa Klub'))].sort();
             
             clubs.forEach(c => {
                 sel.innerHTML += `<option value="${c}">${c}</option>`;
@@ -1020,16 +1040,19 @@
         }
 
         function populateMatchupSelect() {
+            const role = document.getElementById('matchup-role-select') ? document.getElementById('matchup-role-select').value : 'bowl';
+            const targetOppType = role === 'bowl' ? 'batter' : 'bowler';
+            
             const teamSel = document.getElementById('matchup-team-select');
             const sel = document.getElementById('matchup-opp-select');
             const selectedTeam = teamSel ? teamSel.value : '';
 
-            sel.innerHTML = '<option value="">-- Pilih Batter Lawan --</option>';
-            let batters = opponents.filter(o => o.type === 'batter');
+            sel.innerHTML = `<option value="">-- Pilih ${role === 'bowl' ? 'Batter' : 'Bowler'} Lawan --</option>`;
+            let filteredOpponents = opponents.filter(o => o.type === targetOppType);
             
             if (selectedTeam) {
                 // Filter hanya tim yang dipilih
-                batters = batters.filter(o => (o.club || 'Tanpa Klub') === selectedTeam);
+                filteredOpponents = filteredOpponents.filter(o => (o.club || 'Tanpa Klub') === selectedTeam);
                 sel.disabled = false; // Aktifkan dropdown pemain
             } else {
                 // Nonaktifkan jika belum pilih tim
@@ -1039,7 +1062,7 @@
                 return;
             }
             
-            batters.forEach(b => {
+            filteredOpponents.forEach(b => {
                 sel.innerHTML += `<option value="${b.id}">${b.name} (${b.role})</option>`;
             });
 
@@ -1048,6 +1071,7 @@
         }
 
         function generateMatchup() {
+            const role = document.getElementById('matchup-role-select').value;
             const oppId = document.getElementById('matchup-opp-select').value;
             const resultBox = document.getElementById('matchup-result');
             
@@ -1057,29 +1081,58 @@
 
             const opp = opponents.find(o => o.id == oppId);
             let recommendation = "";
-            let recommendedBowler = null;
 
-            if (opp.weaknesses.includes('spin')) {
-                const spinners = myTeam.filter(p => p.isSpin && p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
-                if(spinners.length > 0) {
-                    recommendedBowler = spinners[0];
-                    recommendation = `Gunakan <b>${recommendedBowler.name}</b>. Lawan rentan terhadap Spin, dan dia adalah spinner terhemat kita (Econ: ${calcEcon(recommendedBowler.conceded, recommendedBowler.overs)}). Pasang fielder merapat (Close-in catchers)!`;
-                } else {
-                    recommendation = "Kelemahan lawan di bola Spin, namun Anda tidak punya data Spinner yang siap. Gunakan bowler terhemat dan lempar ke arah kaki.";
-                }
-            } else if (opp.weaknesses.includes('pace') || opp.weaknesses.includes('short') || opp.weaknesses.includes('yorker')) {
-                const fastBowlers = myTeam.filter(p => p.isFast && p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
-                 if(fastBowlers.length > 0) {
-                    recommendedBowler = fastBowlers[0];
-                    recommendation = `Turunkan <b>${recommendedBowler.name}</b> (Fast Bowler). Kecepatan adalah kuncinya. Siapkan fielder di batas pinggir (Boundary) jika lemparan meleset.`;
+            if (role === 'bowl') {
+                // KITA MELEMPAR, MENGHADAPI PEMUKUL LAWAN
+                let recommendedBowler = null;
+                if (opp.weaknesses.includes('spin')) {
+                    const spinners = myTeam.filter(p => p.isSpin && p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
+                    if(spinners.length > 0) {
+                        recommendedBowler = spinners[0];
+                        recommendation = `Gunakan <b>${recommendedBowler.name}</b>. Lawan rentan terhadap Spin, dan dia adalah spinner terhemat kita (Econ: ${calcEcon(recommendedBowler.conceded, recommendedBowler.overs)}). Pasang fielder merapat (Close-in catchers)!`;
+                    } else {
+                        recommendation = "Kelemahan lawan di bola Spin, namun Anda tidak punya data Spinner yang siap. Gunakan bowler terhemat dan lempar ke arah kaki.";
+                    }
+                } else if (opp.weaknesses.includes('pace') || opp.weaknesses.includes('short') || opp.weaknesses.includes('yorker')) {
+                    const fastBowlers = myTeam.filter(p => p.isFast && p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
+                     if(fastBowlers.length > 0) {
+                        recommendedBowler = fastBowlers[0];
+                        recommendation = `Turunkan <b>${recommendedBowler.name}</b> (Fast Bowler). Kecepatan adalah kuncinya. Siapkan fielder di batas pinggir (Boundary) jika lemparan meleset.`;
+                    } else {
+                        const bestBowlers = [...myTeam].filter(p => p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
+                        if(bestBowlers.length > 0) {
+                            recommendation = `Kita butuh Pace Bowler, tapi data kurang. Gunakan <b>${bestBowlers[0].name}</b> sebagai tembok utama (Econ: ${calcEcon(bestBowlers[0].conceded, bestBowlers[0].overs)}). Disiplin Wicket-to-wicket!`;
+                        }
+                    }
                 } else {
                     const bestBowlers = [...myTeam].filter(p => p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
                     if(bestBowlers.length > 0) {
-                        recommendation = `Kita butuh Pace Bowler, tapi data kurang. Gunakan <b>${bestBowlers[0].name}</b> sebagai tembok utama (Econ: ${calcEcon(bestBowlers[0].conceded, bestBowlers[0].overs)}). Disiplin Wicket-to-wicket!`;
+                        recommendation = `Kelemahan spesifik tidak membutuhkan spesialis. Gunakan Pelempar terhemat Anda yaitu <b>${bestBowlers[0].name}</b> untuk mematikan pergerakan angkanya.`;
+                    } else {
+                        recommendation = "Data bowler kita belum cukup. Gunakan Pelempar dengan Dot Ball % tertinggi Anda.";
                     }
                 }
             } else {
-                recommendation = "Kelemahan spesifik tidak membutuhkan spesialis. Gunakan Pelempar dengan Dot Ball % tertinggi Anda untuk mematikan pergerakan angkanya.";
+                // KITA MEMUKUL, MENGHADAPI PELEMPAR LAWAN
+                const bestBattersSR = [...myTeam].filter(p => p.balls > 5).sort((a,b) => calcSR(b.runs, b.balls) - calcSR(a.runs, a.balls));
+                const bestBattersRuns = [...myTeam].filter(p => p.balls > 5).sort((a,b) => b.runs - a.runs);
+                
+                let recBatter = bestBattersSR.length > 0 ? bestBattersSR[0] : (myTeam.length > 0 ? myTeam[0] : null);
+                let anchorBatter = bestBattersRuns.length > 0 ? bestBattersRuns[0] : recBatter;
+
+                if (!recBatter) {
+                    recommendation = "Data skuad kita kosong, tidak bisa memberikan rekomendasi pemukul.";
+                } else {
+                    if (opp.weaknesses.includes('fulltoss') || opp.weaknesses.includes('wide')) {
+                        recommendation = `Pelempar ini kurang disiplin dan sering memberikan bola mudah/wide. Turunkan pemukul paling agresif kita yaitu <b>${recBatter.name}</b> (SR: ${calcSR(recBatter.runs, recBatter.balls)}) untuk menghukum bola-bola buruknya dan mencetak boundary!`;
+                    } else if (opp.tendencies.includes('yorker') || opp.tendencies.includes('goodlength')) {
+                        recommendation = `Pelempar ini sangat akurat dan berbahaya (mengincar area Yorker/Good Length). Turunkan pemukul paling stabil kita yaitu <b>${anchorBatter.name}</b> untuk bermain aman, melindungi gawang, dan fokus pada rotasi strike (single runs).`;
+                    } else if (opp.tendencies.includes('bouncer')) {
+                        recommendation = `Pelempar ini suka memancing dengan pantulan tinggi (Bouncer). Instruksikan pemukul (seperti <b>${recBatter.name}</b>) untuk siap melakukan Pull Shot ke arah Leg-side, atau merunduk (duck) membiarkan bola lewat jika beresiko.`;
+                    } else {
+                        recommendation = `Hadapi pelempar ini dengan pemukul andalan kita, <b>${recBatter.name}</b>, untuk menjaga ritme dan strike rate tim.`;
+                    }
+                }
             }
 
             resultBox.innerHTML = `
@@ -1276,8 +1329,8 @@
             document.querySelectorAll('input[name="vid-opp-tendency-check"]').forEach(cb => cb.checked = false);
 
             renderOpponents();
-            populateMatchupTeamSelect();
-            populateMatchupSelect();
+            // If in matchup view, refresh dropdowns
+            handleMatchupRoleChange();
             showToast("Temuan sinkron ke Database Lawan!");
         }
 
@@ -1423,8 +1476,7 @@
                 }
                 saveData(); 
                 renderOpponents(); 
-                populateMatchupTeamSelect(); 
-                populateMatchupSelect();
+                handleMatchupRoleChange();
                 showToast(`Berhasil menarik ${count} data lawan dari Spreadsheet!`);
             };
             reader.readAsText(file);
@@ -1455,8 +1507,7 @@
             renderTeamTable();
             renderOpponents();
             calculateLiveTactic();
-            populateMatchupTeamSelect();
-            populateMatchupSelect();
+            handleMatchupRoleChange();
         };
 
     </script>
