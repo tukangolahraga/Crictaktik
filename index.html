@@ -2,7 +2,1418 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport"<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CricTactic Analyst PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Slate 100 */
+            color: #0f172a; /* Slate 900 */
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .nav-item.active {
+            background-color: #3b82f6; /* Blue 500 */
+            color: white;
+            font-weight: 600;
+        }
+        .nav-item.active i {
+            color: white;
+        }
+        /* Custom Scrollbar for tables */
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        /* Toast notification */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 50;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.5s, bottom 0.5s;
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+        
+        /* Cricket Field CSS */
+        .cricket-field-container {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 4/3;
+            background-color: #4ade80; /* Green 400 */
+            border: 4px solid #fff;
+            border-radius: 50%;
+            position: relative;
+            margin: 0 auto;
+            cursor: crosshair;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .pitch-area {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12%;
+            height: 35%;
+            background-color: #d4d4d8; /* Zinc 300 / dirt color */
+            border: 1px solid #a1a1aa;
+        }
+        .inner-circle {
+            position: absolute;
+            top: 15%;
+            left: 20%;
+            right: 20%;
+            bottom: 15%;
+            border: 1px dashed rgba(255,255,255,0.6);
+            border-radius: 50%;
+            pointer-events: none; /* Let clicks pass through */
+        }
+        .fielder-dot {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #ef4444; /* Red 500 */
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            pointer-events: none; /* Let clicks pass to field to prevent double triggers */
+            animation: popIn 0.2s ease-out;
+        }
+        .fielder-label {
+            position: absolute;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            transform: translate(-50%, 12px);
+            pointer-events: none;
+        }
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Print Media Styles for clean PDF export */
+        @media print {
+            body { background-color: white !important; overflow: visible !important; height: auto !important; }
+            header, nav#sidebar, .md\:hidden, #mobile-overlay, button[onclick^="switchTab"], button[onclick="resetData()"], button[onclick="openPlayerModal()"], input[type="file"]+label, label[for="import-skuad-csv"], label[for="import-opp-csv"] { display: none !important; }
+            main { padding: 0 !important; margin: 0 !important; width: 100% !important; flex: none !important; overflow: visible !important; }
+            .glass-card { box-shadow: none !important; border: 1px solid #cbd5e1 !important; break-inside: avoid; }
+            section:not(.hidden) { display: block !important; }
+            .hidden { display: none !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Top Navbar -->
+    <header class="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg">
+                <i class="fas fa-cricket-bat-ball text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight">CricTactic PRO</h1>
+                <p class="text-xs text-slate-400">Tactical Match Analyzer</p>
+            </div>
+        </div>
+        <div class="md:hidden">
+            <button onclick="toggleMobileMenu()" class="text-white focus:outline-none">
+                <i class="fas fa-bars text-2xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden relative">
+        
+        <!-- Sidebar Navigation -->
+        <nav id="sidebar" class="bg-white w-64 shadow-lg flex-col gap-2 p-4 hidden md:flex absolute md:relative h-full z-20 transition-transform transform -translate-x-full md:translate-x-0 shrink-0 overflow-y-auto">
+            <div class="mb-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modul Analisis</div>
+            <button onclick="switchTab('dashboard')" class="nav-item active flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors w-full text-left" id="tab-dashboard">
+                <i class="fas fa-chart-pie text-slate-400 w-5 text-center"></i>
+                <span>Dashboard Live</span>
+            </button>
+            <button onclick="switchTab('myteam')" class="nav-item flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors w-full text-left" id="tab-myteam">
+                <i class="fas fa-users text-slate-400 w-5 text-center"></i>
+                <span>Skuad Tim Kita</span>
+            </button>
+            <button onclick="switchTab('opponent')" class="nav-item flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors w-full text-left" id="tab-opponent">
+                <i class="fas fa-user-secret text-slate-400 w-5 text-center"></i>
+                <span>Scouting Lawan</span>
+            </button>
+            <button onclick="switchTab('matchup')" class="nav-item flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors w-full text-left" id="tab-matchup">
+                <i class="fas fa-chess-knight text-slate-400 w-5 text-center"></i>
+                <span>Taktik Matchup</span>
+            </button>
+            
+            <button onclick="switchTab('video')" class="nav-item flex items-center gap-3 p-3 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors w-full text-left border-l-4 border-transparent hover:border-red-500 hover:bg-red-50" id="tab-video">
+                <i class="fab fa-youtube text-red-500 w-5 text-center"></i>
+                <span class="font-semibold text-slate-700">Analisis Video Lawan</span>
+            </button>
+            
+            <div class="mt-auto pt-4 border-t border-slate-200 flex flex-col gap-2">
+                <button onclick="window.print()" class="flex items-center gap-3 p-3 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors w-full text-left">
+                    <i class="fas fa-print w-5 text-center"></i>
+                    <span>Cetak Laporan (PDF)</span>
+                </button>
+                <button onclick="resetData()" class="flex items-center gap-3 p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors w-full text-left">
+                    <i class="fas fa-trash-alt w-5 text-center"></i>
+                    <span>Reset Sesi Ini</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Content Container -->
+        <main class="flex-1 p-4 md:p-6 overflow-y-auto bg-slate-50 relative w-full" id="main-content">
+            
+            <!-- VIEW: DASHBOARD & LIVE CALCULATOR -->
+            <section id="view-dashboard" class="block space-y-6">
+                <h2 class="text-2xl font-bold text-slate-800 border-b pb-2">Kalkulator Situasi Live</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Live Match Input -->
+                    <div class="glass-card p-5 border-l-4 border-l-blue-500">
+                        <h3 class="text-lg font-semibold mb-4 text-slate-700"><i class="fas fa-stopwatch mr-2"></i>Kondisi Pengejaran (Chasing)</h3>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Target Runs</label>
+                                <input type="number" id="calc-target" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" value="150" min="1">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Runs Saat Ini</label>
+                                <input type="number" id="calc-current" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" value="45" min="0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Sisa Bola (Balls)</label>
+                                <input type="number" id="calc-balls" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" value="60" min="1">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Gawang Jatuh (Wickets)</label>
+                                <input type="number" id="calc-wickets" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" value="2" min="0" max="10">
+                            </div>
+                        </div>
+                        <button onclick="calculateLiveTactic()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded shadow transition-colors print:hidden">
+                            Analisis Situasi Sekarang
+                        </button>
+                    </div>
+
+                    <!-- Live Strategy Output -->
+                    <div class="glass-card p-5 bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-xl relative overflow-hidden">
+                        <div class="absolute -right-10 -top-10 opacity-10 text-9xl"><i class="fas fa-brain"></i></div>
+                        <h3 class="text-lg font-semibold mb-2 text-blue-300">Rekomendasi AI Pelatih</h3>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4 text-center mt-4">
+                            <div class="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                                <p class="text-xs text-slate-400 uppercase tracking-wide">Req. Run Rate (RRR)</p>
+                                <p id="out-rrr" class="text-3xl font-bold text-yellow-400">0.0</p>
+                                <p class="text-[10px] text-slate-300">Runs per Over</p>
+                            </div>
+                            <div class="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                                <p class="text-xs text-slate-400 uppercase tracking-wide">Runs Dibutuhkan</p>
+                                <p id="out-runs-needed" class="text-3xl font-bold text-white">0</p>
+                                <p id="out-balls-needed" class="text-[10px] text-slate-300">dari 0 bola</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-slate-800 p-4 rounded-lg border-l-4 border-l-yellow-400 shadow-inner">
+                            <p class="text-sm font-medium text-slate-300 mb-1">Instruksi Lapangan:</p>
+                            <p id="out-instruction" class="text-md font-bold text-white leading-snug">
+                                Masukkan data pertandingan untuk melihat rekomendasi taktik di sini.
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-700 p-4 rounded-lg border-l-4 border-l-blue-400 shadow-inner mt-4">
+                            <p class="text-sm font-medium text-slate-300 mb-1"><i class="fas fa-users-cog mr-2"></i>Rekomendasi Urutan Pemukul (Batting Order):</p>
+                            <p id="out-batting-order" class="text-sm font-bold text-blue-200 leading-snug">
+                                -
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualisasi Performa Skuad -->
+                <div class="glass-card p-5 mt-6 border-t-4 border-t-indigo-500">
+                    <h3 class="text-lg font-semibold mb-4 text-slate-700">Peta Kekuatan Tim (Berdasarkan Data)</h3>
+                    <div class="relative w-full h-64 md:h-80 lg:h-96">
+                        <canvas id="teamChart"></canvas>
+                    </div>
+                    <p class="text-xs text-slate-500 text-center mt-2">*Semakin kanan: Makin Cepat Mencetak Angka (Agresif). Semakin bawah: Makin Hemat Kemasukan Angka (Disiplin).</p>
+                </div>
+            </section>
+
+            <!-- VIEW: MY TEAM -->
+            <section id="view-myteam" class="hidden space-y-6">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b pb-2 gap-4">
+                    <h2 class="text-2xl font-bold text-slate-800">Database Skuad Kita</h2>
+                    <div class="flex flex-wrap gap-2 print:hidden">
+                        <input type="file" id="import-skuad-csv" class="hidden" accept=".csv" onchange="importTeamCSV(event)">
+                        <label for="import-skuad-csv" class="cursor-pointer bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded shadow font-medium text-sm flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file-import"></i> Tarik Data (CSV)
+                        </label>
+                        <button onclick="exportTeamCSV()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow font-medium text-sm flex items-center gap-2 transition-colors" title="Export format kompatibel Google Spreadsheet">
+                            <i class="fas fa-file-export"></i> Backup ke Spreadsheet
+                        </button>
+                        <button onclick="openPlayerModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow font-medium text-sm flex items-center gap-2 transition-colors">
+                            <i class="fas fa-plus"></i> Tambah / Edit
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-card overflow-hidden">
+                    <div class="table-container overflow-x-auto w-full">
+                        <table class="w-full text-left border-collapse min-w-max">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                                    <th class="p-4 font-semibold">Nama Pemain</th>
+                                    <th class="p-4 font-semibold text-center bg-blue-50/50">Runs</th>
+                                    <th class="p-4 font-semibold text-center bg-blue-50/50">Balls</th>
+                                    <th class="p-4 font-semibold text-center text-blue-700 bg-blue-100/50" title="Strike Rate: (Runs/Balls)*100">SR ⚡</th>
+                                    <th class="p-4 font-semibold text-center bg-red-50/50">Overs</th>
+                                    <th class="p-4 font-semibold text-center bg-red-50/50">Wickets</th>
+                                    <th class="p-4 font-semibold text-center bg-red-50/50">Conceded</th>
+                                    <th class="p-4 font-semibold text-center bg-slate-100" title="Persentase bola kosong">Dot % 🛡️</th>
+                                    <th class="p-4 font-semibold text-center text-red-700 bg-red-100/50" title="Economy Rate: Runs/Overs">Econ 🎯</th>
+                                    <th class="p-4 font-semibold text-center bg-slate-100 print:hidden">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="team-table-body" class="text-sm divide-y divide-slate-100">
+                                <!-- Data rendered via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: OPPONENT SCOUTING -->
+            <section id="view-opponent" class="hidden space-y-6">
+                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b pb-2 gap-4">
+                    <h2 class="text-2xl font-bold text-slate-800">Buku Catatan Lawan (Scouting)</h2>
+                    <div class="flex flex-wrap gap-2 print:hidden">
+                        <input type="file" id="import-opp-csv" class="hidden" accept=".csv" onchange="importOpponentCSV(event)">
+                        <label for="import-opp-csv" class="cursor-pointer bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded shadow font-medium text-sm flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file-import"></i> Tarik Data
+                        </label>
+                        <button onclick="exportOpponentCSV()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded shadow font-medium text-sm flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file-export"></i> Backup Spreadsheet
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Form Tambah Lawan -->
+                    <div class="glass-card p-5 lg:col-span-1 border-t-4 border-t-orange-500 h-fit print:hidden">
+                        <h3 class="text-lg font-semibold mb-4 text-slate-700">Catat Profil Lawan</h3>
+                        <form id="form-opponent" onsubmit="addOpponent(event)">
+                            <div class="mb-3">
+                                <label class="block text-sm text-slate-600 mb-1">Nama Klub / Tim <span class="text-xs text-red-400">*</span></label>
+                                <input type="text" id="opp-club" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Misal: Tim Garuda">
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-sm text-slate-600 mb-1">Nama Pemain Lawan</label>
+                                <input type="text" id="opp-name" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Misal: Budi (Opener)">
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-sm text-slate-600 mb-1">Peran / Posisi Utama</label>
+                                <select id="opp-role" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-orange-500 outline-none">
+                                    <option value="Top-order Batter">Top-order Batter (Pemukul Awal)</option>
+                                    <option value="Middle-order Batter">Middle-order Batter (Pemukul Tengah)</option>
+                                    <option value="Fast Bowler">Fast Bowler (Pelempar Cepat)</option>
+                                    <option value="Spin Bowler">Spin Bowler (Pelempar Spin)</option>
+                                    <option value="All-rounder">All-rounder (Serba Bisa)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-sm text-slate-600 mb-1">Analisis Sebagai</label>
+                                <select id="opp-type" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-orange-500 outline-none">
+                                    <option value="batter">Pemukul (Batter)</option>
+                                    <option value="bowler">Pelempar (Bowler)</option>
+                                </select>
+                            </div>
+                            <div class="mb-4 bg-orange-50 p-3 rounded border border-orange-100">
+                                <label class="block text-sm font-bold text-slate-700 mb-2">Kelemahan Terdeteksi</label>
+                                <div id="opp-weakness-container" class="space-y-2 text-sm text-slate-700">
+                                    <!-- Checkboxes populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+                                <label class="block text-sm font-bold text-slate-700 mb-2" id="label-tendency">Arah/Gaya Dominan</label>
+                                <div id="opp-tendency-container" class="space-y-2 text-sm text-slate-700">
+                                    <!-- Checkboxes populated by JS -->
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded shadow transition-colors">
+                                Simpan Profil Lawan
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Daftar Lawan -->
+                    <div class="glass-card p-0 lg:col-span-2 overflow-hidden flex flex-col w-full">
+                        <div class="p-4 border-b bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                            <div>
+                                <h3 class="text-md font-semibold text-slate-700">Database Scouting Lawan</h3>
+                                <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-bold" id="opp-count">0 Terdaftar</span>
+                            </div>
+                            <div class="w-full md:w-auto flex items-center gap-2 print:hidden">
+                                <label class="text-xs text-slate-600 font-medium">Tampilkan Tim:</label>
+                                <select id="opp-club-filter" onchange="renderOpponents()" class="p-1.5 text-sm border border-slate-300 rounded outline-none focus:ring-2 focus:ring-orange-500 w-full md:w-48 bg-white">
+                                    <option value="">-- Semua Tim --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="p-4 space-y-4 overflow-y-auto max-h-[600px] bg-slate-50/50 print:max-h-full print:overflow-visible" id="opponent-list">
+                            <!-- Data rendered via JS grouped by Club -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: VIDEO ANALYSIS -->
+            <section id="view-video" class="hidden space-y-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-2 gap-4">
+                    <h2 class="text-2xl font-bold text-slate-800">Ruang Analisis Video Bersama</h2>
+                    <p class="text-sm text-slate-500">Tonton rekaman pertandingan lawan untuk identifikasi taktik bersama tim.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Video Player Area -->
+                    <div class="glass-card p-5 lg:col-span-2 border-t-4 border-t-red-600">
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="video-url" class="flex-1 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" placeholder="Tempel Link YouTube atau Google Drive di sini...">
+                            <button onclick="loadVideo()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg shadow font-medium transition-colors flex items-center gap-2">
+                                <i class="fab fa-youtube"></i> Putar
+                            </button>
+                        </div>
+                        <div class="aspect-video w-full bg-slate-900 rounded-lg overflow-hidden shadow-inner relative" id="video-container">
+                            <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+                                <i class="fab fa-youtube text-6xl mb-3 opacity-50"></i>
+                                <p>Masukkan link YouTube atau GDrive untuk mulai menganalisis.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Scouting Form -->
+                    <div class="glass-card p-5 lg:col-span-1 bg-slate-800 text-white shadow-xl flex flex-col">
+                        <h3 class="text-lg font-semibold mb-2 text-red-400"><i class="fas fa-eye mr-2"></i>Catat Temuan Live</h3>
+                        <p class="text-xs text-slate-400 mb-4">Data yang dicatat di sini otomatis masuk ke Database Scouting Lawan Anda.</p>
+                        
+                        <div class="space-y-4 flex-1">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Nama Klub / Tim (Video)</label>
+                                <input type="text" id="vid-opp-club" class="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-red-400 outline-none text-sm" placeholder="Contoh: Tim B">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Nama Pemain di Video</label>
+                                <input type="text" id="vid-opp-name" class="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-red-400 outline-none text-sm" placeholder="Contoh: Rohit S.">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Observasi Kelemahan (Temuan Cepat)</label>
+                                <select id="vid-opp-weakness" class="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-red-400 outline-none text-sm">
+                                    <option value="spin">Sangat lemah membaca putaran (Spin)</option>
+                                    <option value="short">Takut/mundur hadapi bola pantulan tinggi</option>
+                                    <option value="yorker">Gagal menahan bola tepat di kaki (Yorker)</option>
+                                    <option value="wide">Sering memancing bola jauh di luar (Wide)</option>
+                                    <option value="fulltoss">Sering melempar bola Full-toss (Untuk Bowler)</option>
+                                </select>
+                            </div>
+                            <button onclick="saveFromVideo()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded shadow transition-colors text-sm">
+                                <i class="fas fa-save mr-1"></i> Simpan ke Database
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: MATCHUP STRATEGY & FIELDING -->
+            <section id="view-matchup" class="hidden space-y-6">
+                 <h2 class="text-2xl font-bold text-slate-800 border-b pb-2">Analisis Taktik Matchup & Simulasi Fielding</h2>
+                 
+                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                     <!-- Matchup Logic -->
+                     <div class="glass-card p-6 border-l-4 border-l-purple-500 h-fit">
+                         <h3 class="text-lg font-bold text-slate-700 mb-2">Simulasi Pelempar vs Pemukul</h3>
+                         <p class="text-slate-600 mb-6 text-sm">Pilih pemukul lawan di lapangan. Sistem akan mencari pelempar terbaik berdasarkan statistik riil kita.</p>
+                         
+                         <div class="flex flex-col gap-4">
+                             <div class="print:hidden">
+                                 <label class="block text-sm font-semibold text-slate-700 mb-2">Pilih Tim Lawan:</label>
+                                 <select id="matchup-team-select" class="w-full p-2 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm mb-4" onchange="populateMatchupSelect()">
+                                     <option value="">-- Pilih Tim Lawan --</option>
+                                 </select>
+
+                                 <label class="block text-sm font-semibold text-slate-700 mb-2">Pemukul Lawan di Area Strike:</label>
+                                 <select id="matchup-opp-select" class="w-full p-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm text-lg" onchange="generateMatchup()" disabled>
+                                     <option value="">-- Pilih Tim Terlebih Dahulu --</option>
+                                 </select>
+                             </div>
+                             <div class="flex justify-center text-2xl text-slate-300 print:hidden">
+                                 <i class="fas fa-arrow-down"></i>
+                             </div>
+                             <div class="bg-purple-50 rounded-lg p-4 border border-purple-100 min-h-[120px] flex flex-col justify-center shadow-inner" id="matchup-result">
+                                 <p class="text-slate-400 text-center text-sm italic">Pilih musuh terlebih dahulu untuk melihat rekomendasi pelatih.</p>
+                             </div>
+                         </div>
+                     </div>
+
+                     <!-- Interactive Fielding Placement -->
+                     <div class="glass-card p-6 border-t-4 border-t-emerald-500">
+                         <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-slate-700"><i class="fas fa-map-marker-alt text-emerald-500 mr-2"></i>Peta Lapangan (Fielding)</h3>
+                            <button onclick="resetFielding()" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 rounded transition-colors font-medium print:hidden">Reset Posisi</button>
+                         </div>
+                         <p class="text-xs text-slate-500 mb-4 text-center">Klik di area hijau untuk menempatkan pemain (<span id="fielder-count">0</span>/11 pemain).</p>
+                         
+                         <div class="cricket-field-container print:border-slate-800" onclick="placeFielder(event)" id="fielding-map">
+                             <div class="inner-circle print:border-slate-800"></div>
+                             <div class="pitch-area print:border-slate-800"></div>
+                             <!-- Fielders injected here via JS -->
+                         </div>
+                     </div>
+                 </div>
+                 
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                     <div class="glass-card p-5">
+                         <h3 class="text-md font-bold text-slate-700 mb-3"><i class="fas fa-fire text-red-500 mr-2"></i>Senjata Utama (Best Strike Rate Kita)</h3>
+                         <ul class="divide-y divide-slate-100" id="top-batters"></ul>
+                     </div>
+                     <div class="glass-card p-5">
+                         <h3 class="text-md font-bold text-slate-700 mb-3"><i class="fas fa-shield-alt text-blue-500 mr-2"></i>Tembok Pertahanan (Best Econ Kita)</h3>
+                         <ul class="divide-y divide-slate-100" id="top-bowlers"></ul>
+                     </div>
+                 </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- OVERLAYS & MODALS -->
+    <!-- Mobile overlay -->
+    <div id="mobile-overlay" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-10 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+    <!-- Add/Edit Player Modal -->
+    <div id="player-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-slate-800 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-lg"><i class="fas fa-user-edit mr-2"></i>Evaluasi Live / Data Pemain</h3>
+                <button onclick="closePlayerModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto">
+                <form id="form-player" onsubmit="savePlayer(event)">
+                    <input type="hidden" id="p-id" value="">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Nama Pemain</label>
+                        <input type="text" id="p-name" required class="w-full p-2 border border-slate-300 rounded focus:border-blue-500 outline-none" placeholder="Nama Panggilan">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="col-span-2">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Keahlian Tambahan (Penting untuk Matchup)</label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center gap-2 cursor-pointer text-sm bg-slate-50 p-2 rounded border w-1/2">
+                                    <input type="checkbox" id="p-is-spin" class="rounded text-blue-600 w-4 h-4"> Spinner (Bola Putar)
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer text-sm bg-slate-50 p-2 rounded border w-1/2">
+                                    <input type="checkbox" id="p-is-fast" class="rounded text-blue-600 w-4 h-4"> Fast Bowler (Pace)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                        <h4 class="text-sm font-bold text-blue-800 mb-2 border-b border-blue-200 pb-1">Statistik Memukul (Batting)</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Total Runs Dicetak</label>
+                                <input type="number" id="p-runs" class="w-full p-2 border border-slate-300 rounded text-sm outline-none" value="0" min="0">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Total Bola Dihadapi</label>
+                                <input type="number" id="p-balls" class="w-full p-2 border border-slate-300 rounded text-sm outline-none" value="0" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 p-3 rounded-lg border border-red-100 mb-4">
+                        <h4 class="text-sm font-bold text-red-800 mb-2 border-b border-red-200 pb-1">Statistik Melempar (Bowling)</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Overs Dilempar</label>
+                                <input type="number" id="p-overs" step="0.1" class="w-full p-2 border border-slate-300 rounded text-sm outline-none" value="0" min="0">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-600 mb-1">Wickets Diambil</label>
+                                <input type="number" id="p-wickets" class="w-full p-2 border border-slate-300 rounded text-sm outline-none" value="0" min="0">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-xs text-slate-600 mb-1">Runs Kemasukan</label>
+                                <input type="number" id="p-conceded" class="w-full p-2 border border-slate-300 rounded text-sm outline-none" value="0" min="0">
+                            </div>
+                            <div class="col-span-2 bg-slate-100 p-2 rounded border border-slate-200">
+                                <label class="block text-xs text-slate-700 font-bold mb-1">Dot Balls (Bola Kosong)</label>
+                                <input type="number" id="p-dots" class="w-full p-2 border border-slate-300 rounded text-sm outline-none" value="0" min="0">
+                                <p class="text-[10px] text-slate-500 mt-1">Metrik penting untuk mengukur tekanan yang diberikan bowler ke lawan.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-lg shadow mt-2 transition-colors">
+                        Simpan Evaluasi Data
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert/Toast -->
+    <div id="toast">Notifikasi</div>
+
+    <script>
+        // --- DATA STATE ---
+        let myTeam = [];
+        let opponents = [];
+        
+        // Data Default (diperbarui dengan properti klub)
+        const defaultTeam = [
+            { id: 1, name: "Arif (Kapten)", runs: 145, balls: 90, overs: 0, wickets: 0, conceded: 0, dots: 0, isSpin: false, isFast: false },
+            { id: 2, name: "Bima (All-round)", runs: 85, balls: 50, overs: 12, wickets: 5, conceded: 85, dots: 20, isSpin: true, isFast: false },
+            { id: 3, name: "Candra", runs: 20, balls: 18, overs: 16, wickets: 8, conceded: 90, dots: 35, isSpin: false, isFast: true },
+            { id: 4, name: "Deni", runs: 210, balls: 130, overs: 0, wickets: 0, conceded: 0, dots: 0, isSpin: false, isFast: false },
+            { id: 5, name: "Eko (Spinner)", runs: 10, balls: 15, overs: 20, wickets: 12, conceded: 110, dots: 40, isSpin: true, isFast: false }
+        ];
+
+        const defaultOpponents = [
+            { id: 1, club: "Tim A", name: "Johan (Opener)", role: "Top-order Batter", type: "batter", weaknesses: ["spin", "yorker"], tendencies: ["offside", "straight"] },
+            { id: 2, club: "Tim B", name: "Rizky (Slogger)", role: "Middle-order Batter", type: "batter", weaknesses: ["short"], tendencies: ["legside"] },
+            { id: 3, club: "Tim A", name: "Anton (Spinner)", role: "Spin Bowler", type: "bowler", weaknesses: ["flat"], tendencies: ["goodlength"] }
+        ];
+
+        // Dictionary of weakness types
+        const weaknessDict = {
+            "batter": [
+                { val: "spin", label: "Lemah terhadap bola putar (Spin)" },
+                { val: "short", label: "Takut pantulan tinggi (Short-pitch/Bouncer)" },
+                { val: "yorker", label: "Sering kekebolan bola tepat di kaki (Yorker)" },
+                { val: "pace", label: "Kesusahan memukul bola super cepat (Pace)" },
+                { val: "wide", label: "Sering terpancing bola lebar di luar (Wide)" }
+            ],
+            "bowler": [
+                { val: "fulltoss", label: "Sering lempar Full-toss (mudah dipukul Boundary)" },
+                { val: "wide", label: "Tidak disiplin (Sering Wide/No-ball)" },
+                { val: "death", label: "Mental turun / Panik di Over akhir (Death overs)" },
+                { val: "flat", label: "Lemparan spin-nya datar (kurang berputar)" }
+            ]
+        };
+
+        const tendencyDict = {
+            "batter": [
+                { val: "offside", label: "Sering mengincar area Off-side (Cover Drive, dll)" },
+                { val: "legside", label: "Sangat dominan menarik bola ke Leg-side (Pull/Hook)" },
+                { val: "straight", label: "Suka memukul bola lurus ke depan (Straight Drive)" },
+                { val: "fine", label: "Suka memukul pelan ke belakang gawang (Sweep/Flick)" }
+            ],
+            "bowler": [
+                { val: "yorker", label: "Sering dan akurat melempar bola Yorker (di kaki)" },
+                { val: "bouncer", label: "Sering memancing dengan lemparan pendek (Bouncer)" },
+                { val: "goodlength", label: "Disiplin melempar di area Good Length (susah dipukul)" },
+                { val: "wide", label: "Sengaja melempar jauh (Wide Yorker) di akhir pertandingan" }
+            ]
+        };
+
+        let teamChartInstance = null;
+        let fieldersCount = 0;
+        const MAX_FIELDERS = 11;
+
+        // --- LOCAL STORAGE FUNCTIONS ---
+        function loadData() {
+            const storedTeam = localStorage.getItem('crictactic_team');
+            const storedOpponents = localStorage.getItem('crictactic_opponents');
+            
+            myTeam = storedTeam ? JSON.parse(storedTeam) : [...defaultTeam];
+            opponents = storedOpponents ? JSON.parse(storedOpponents) : [...defaultOpponents];
+        }
+
+        function saveData() {
+            localStorage.setItem('crictactic_team', JSON.stringify(myTeam));
+            localStorage.setItem('crictactic_opponents', JSON.stringify(opponents));
+        }
+
+        // --- CORE NAVIGATION & UI ---
+        function switchTab(tabId) {
+            ['dashboard', 'myteam', 'opponent', 'matchup', 'video'].forEach(id => {
+                const view = document.getElementById('view-' + id);
+                const tab = document.getElementById('tab-' + id);
+                if(view) view.classList.add('hidden');
+                if(tab) tab.classList.remove('active', 'border-red-500', 'bg-red-50');
+                if (tab && id !== 'video') tab.classList.remove('active');
+            });
+            
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            const activeTab = document.getElementById('tab-' + tabId);
+            if(tabId === 'video') {
+                activeTab.classList.add('border-l-4', 'border-red-500', 'bg-red-50');
+            } else {
+                activeTab.classList.add('active');
+            }
+            
+            if(window.innerWidth < 768) toggleMobileMenu();
+            
+            if(tabId === 'dashboard') {
+                setTimeout(() => updateChart(), 100); 
+            }
+            if(tabId === 'matchup') {
+                populateMatchupTeamSelect();
+                populateMatchupSelect();
+            }
+        }
+
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        // --- MATH CALCULATIONS ---
+        function calcSR(runs, balls) {
+            if (!balls || balls == 0) return 0;
+            return ((runs / balls) * 100).toFixed(1);
+        }
+
+        function calcEcon(conceded, overs) {
+            if (!overs || overs == 0) return 0;
+            return (conceded / overs).toFixed(2);
+        }
+
+        function calcDotPct(dots, overs) {
+            if (!overs || overs == 0) return 0;
+            const totalBalls = overs * 6;
+            return ((dots / totalBalls) * 100).toFixed(1);
+        }
+
+        // --- RENDER TABLES & LISTS ---
+        function renderTeamTable() {
+            const tbody = document.getElementById('team-table-body');
+            tbody.innerHTML = '';
+            
+            myTeam.forEach(p => {
+                const sr = calcSR(p.runs, p.balls);
+                const econ = calcEcon(p.conceded, p.overs);
+                const dotPct = calcDotPct(p.dots, p.overs);
+                
+                let tags = '';
+                if(p.isSpin) tags += `<span class="text-[10px] bg-blue-100 text-blue-800 px-1 rounded ml-1">Spin</span>`;
+                if(p.isFast) tags += `<span class="text-[10px] bg-red-100 text-red-800 px-1 rounded ml-1">Fast</span>`;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 border-b border-slate-100">
+                        <div class="font-medium text-slate-800">${p.name}</div>
+                        <div class="mt-1">${tags}</div>
+                    </td>
+                    <td class="p-3 text-center bg-blue-50/20">${p.runs}</td>
+                    <td class="p-3 text-center bg-blue-50/20">${p.balls}</td>
+                    <td class="p-3 text-center font-bold text-blue-700 bg-blue-50/40">${sr}</td>
+                    <td class="p-3 text-center bg-red-50/20">${p.overs}</td>
+                    <td class="p-3 text-center bg-red-50/20">${p.wickets}</td>
+                    <td class="p-3 text-center bg-red-50/20">${p.conceded}</td>
+                    <td class="p-3 text-center font-bold text-slate-700 bg-slate-50">${dotPct}%</td>
+                    <td class="p-3 text-center font-bold text-red-700 bg-red-50/40">${econ > 0 ? econ : '-'}</td>
+                    <td class="p-3 text-center bg-slate-50 print:hidden">
+                        <button onclick="editPlayer(${p.id})" class="text-blue-500 hover:text-blue-700 bg-blue-100 px-2 py-1 rounded text-xs"><i class="fas fa-edit"></i> Edit/Live</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            updateTopPerformers();
+            updateChart();
+        }
+
+        // --- PLAYER MODAL LOGIC ---
+        function openPlayerModal() {
+            document.getElementById('form-player').reset();
+            document.getElementById('p-id').value = ""; 
+            document.getElementById('player-modal').classList.remove('hidden');
+        }
+        
+        function editPlayer(id) {
+            const p = myTeam.find(x => x.id === id);
+            if(p) {
+                document.getElementById('p-id').value = p.id;
+                document.getElementById('p-name').value = p.name;
+                document.getElementById('p-is-spin').checked = p.isSpin;
+                document.getElementById('p-is-fast').checked = p.isFast;
+                document.getElementById('p-runs').value = p.runs;
+                document.getElementById('p-balls').value = p.balls;
+                document.getElementById('p-overs').value = p.overs;
+                document.getElementById('p-wickets').value = p.wickets;
+                document.getElementById('p-conceded').value = p.conceded;
+                document.getElementById('p-dots').value = p.dots || 0;
+                document.getElementById('player-modal').classList.remove('hidden');
+            }
+        }
+
+        function closePlayerModal() {
+            document.getElementById('player-modal').classList.add('hidden');
+        }
+
+        function savePlayer(e) {
+            e.preventDefault();
+            const id = document.getElementById('p-id').value;
+            const name = document.getElementById('p-name').value;
+            const isSpin = document.getElementById('p-is-spin').checked;
+            const isFast = document.getElementById('p-is-fast').checked;
+            const runs = parseInt(document.getElementById('p-runs').value) || 0;
+            const balls = parseInt(document.getElementById('p-balls').value) || 0;
+            const overs = parseFloat(document.getElementById('p-overs').value) || 0;
+            const wickets = parseInt(document.getElementById('p-wickets').value) || 0;
+            const conceded = parseInt(document.getElementById('p-conceded').value) || 0;
+            const dots = parseInt(document.getElementById('p-dots').value) || 0;
+
+            if (id) {
+                const index = myTeam.findIndex(x => x.id == id);
+                if(index > -1) {
+                    myTeam[index] = { id: parseInt(id), name, isSpin, isFast, runs, balls, overs, wickets, conceded, dots };
+                    showToast(`Evaluasi Live ${name} diperbarui!`);
+                }
+            } else {
+                myTeam.push({ id: Date.now(), name, isSpin, isFast, runs, balls, overs, wickets, conceded, dots });
+                showToast(`Pemain ${name} berhasil ditambahkan!`);
+            }
+
+            saveData();
+            renderTeamTable();
+            closePlayerModal();
+        }
+
+        // --- OPPONENT SCOUTING LOGIC ---
+        document.getElementById('opp-type').addEventListener('change', function(e) {
+            const type = e.target.value;
+            const weakContainer = document.getElementById('opp-weakness-container');
+            weakContainer.innerHTML = '';
+            weaknessDict[type].forEach(w => {
+                weakContainer.innerHTML += `
+                    <label class="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border hover:bg-slate-50">
+                        <input type="checkbox" name="opp-weak-check" value="${w.val}" class="rounded text-orange-600 w-4 h-4"> 
+                        ${w.label}
+                    </label>
+                `;
+            });
+            
+            const tendContainer = document.getElementById('opp-tendency-container');
+            tendContainer.innerHTML = '';
+            tendencyDict[type].forEach(t => {
+                tendContainer.innerHTML += `
+                    <label class="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border hover:bg-blue-50">
+                        <input type="checkbox" name="opp-tendency-check" value="${t.val}" class="rounded text-blue-600 w-4 h-4"> 
+                        ${t.label}
+                    </label>
+                `;
+            });
+            
+            document.getElementById('label-tendency').innerText = type === 'batter' ? "Arah Pukulan Dominan" : "Area Lemparan Dominan";
+        });
+
+        function updateOpponentFilterOptions() {
+            const select = document.getElementById('opp-club-filter');
+            const currentVal = select.value;
+            
+            // Dapatkan daftar klub yang unik
+            const clubs = [...new Set(opponents.map(o => o.club || 'Tanpa Klub'))].sort();
+            
+            select.innerHTML = '<option value="">-- Semua Tim --</option>';
+            clubs.forEach(c => {
+                select.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+            
+            // Pertahankan filter jika masih ada
+            if(clubs.includes(currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        function addOpponent(e) {
+            e.preventDefault();
+            const club = document.getElementById('opp-club').value.trim() || 'Tanpa Klub';
+            const name = document.getElementById('opp-name').value;
+            const role = document.getElementById('opp-role').value;
+            const type = document.getElementById('opp-type').value;
+            
+            const weakCheckboxes = document.querySelectorAll('input[name="opp-weak-check"]:checked');
+            let weaknesses = [];
+            weakCheckboxes.forEach((cb) => weaknesses.push(cb.value));
+
+            const tendCheckboxes = document.querySelectorAll('input[name="opp-tendency-check"]:checked');
+            let tendencies = [];
+            tendCheckboxes.forEach((cb) => tendencies.push(cb.value));
+
+            if(weaknesses.length === 0 && tendencies.length === 0) {
+                showToast("Pilih minimal satu kelemahan atau arah dominan."); return;
+            }
+
+            opponents.push({ id: Date.now(), club, name, role, type, weaknesses, tendencies });
+            
+            saveData();
+
+            document.getElementById('form-opponent').reset();
+            document.getElementById('opp-type').dispatchEvent(new Event('change'));
+            
+            renderOpponents();
+            populateMatchupTeamSelect();
+            populateMatchupSelect();
+            showToast("Profil Lawan & Taktik disimpan!");
+        }
+
+        function renderOpponents() {
+            updateOpponentFilterOptions();
+            
+            const list = document.getElementById('opponent-list');
+            const filterVal = document.getElementById('opp-club-filter').value;
+            
+            // Lakukan Filter jika dropdown dipilih
+            let filteredOps = opponents;
+            if (filterVal) {
+                filteredOps = opponents.filter(o => (o.club || 'Tanpa Klub') === filterVal);
+            }
+
+            document.getElementById('opp-count').innerText = `${filteredOps.length} Ditampilkan`;
+            list.innerHTML = '';
+            
+            if(filteredOps.length === 0) {
+                list.innerHTML = '<p class="text-sm text-slate-400 italic">Belum ada data lawan untuk tim ini.</p>'; return;
+            }
+
+            // Kelompokkan dalam satu rumpun berdasarkan Club
+            const grouped = {};
+            filteredOps.forEach(o => {
+                const cName = o.club || 'Tanpa Klub';
+                if(!grouped[cName]) grouped[cName] = [];
+                grouped[cName].push(o);
+            });
+
+            // Render per Club
+            for (const club in grouped) {
+                list.innerHTML += `
+                    <div class="col-span-full">
+                        <h4 class="bg-indigo-100 text-indigo-800 font-bold px-3 py-2 rounded-t-lg mt-4 text-sm uppercase tracking-wider border-b border-indigo-200">
+                            <i class="fas fa-shield-alt mr-2"></i>Klub / Tim: ${club}
+                        </h4>
+                        <div class="bg-white border border-t-0 border-indigo-100 rounded-b-lg p-3 space-y-3 shadow-sm">
+                            ${grouped[club].map(o => renderOpponentCard(o)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderOpponentCard(o) {
+            const isBat = o.type === 'batter';
+            const icon = isBat ? '<i class="fas fa-baseball-bat-ball text-orange-500"></i>' : '<i class="fas fa-baseball text-orange-500"></i>';
+            
+            let weakBadges = '';
+            if (o.weaknesses) {
+                o.weaknesses.forEach(wVal => {
+                    const dict = weaknessDict[o.type].find(d => d.val === wVal);
+                    const label = dict ? dict.label : wVal;
+                    weakBadges += `<span class="inline-block bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full mr-1 mb-1 border border-red-200"><i class="fas fa-arrow-down mr-1"></i>${label}</span>`;
+                });
+            }
+            
+            let tendBadges = '';
+            if (o.tendencies) {
+                o.tendencies.forEach(tVal => {
+                    const dict = tendencyDict[o.type].find(d => d.val === tVal);
+                    const label = dict ? dict.label : tVal;
+                    tendBadges += `<span class="inline-block bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-full mr-1 mb-1 border border-blue-200"><i class="fas fa-star mr-1"></i>${label}</span>`;
+                });
+            }
+
+            return `
+                <div class="p-3 rounded-lg border border-slate-100 bg-slate-50 flex items-start gap-3">
+                    <div class="mt-1">${icon}</div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800 text-sm">${o.name} <span class="font-normal text-xs text-slate-500">(${o.role})</span></p>
+                        <div class="mt-2">
+                            ${weakBadges}
+                            ${tendBadges}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- MATCHUP & FIELDING LOGIC ---
+        function populateMatchupTeamSelect() {
+            const sel = document.getElementById('matchup-team-select');
+            if(!sel) return;
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">-- Semua Tim --</option>';
+            
+            // Cari nama tim yang unik dari para batter
+            const clubs = [...new Set(opponents.filter(o => o.type === 'batter').map(o => o.club || 'Tanpa Klub'))].sort();
+            
+            clubs.forEach(c => {
+                sel.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+            
+            if (clubs.includes(currentVal)) {
+                sel.value = currentVal;
+            }
+        }
+
+        function populateMatchupSelect() {
+            const teamSel = document.getElementById('matchup-team-select');
+            const sel = document.getElementById('matchup-opp-select');
+            const selectedTeam = teamSel ? teamSel.value : '';
+
+            sel.innerHTML = '<option value="">-- Pilih Batter Lawan --</option>';
+            let batters = opponents.filter(o => o.type === 'batter');
+            
+            if (selectedTeam) {
+                // Filter hanya tim yang dipilih
+                batters = batters.filter(o => (o.club || 'Tanpa Klub') === selectedTeam);
+                sel.disabled = false; // Aktifkan dropdown pemain
+            } else {
+                // Nonaktifkan jika belum pilih tim
+                sel.innerHTML = '<option value="">-- Pilih Tim Terlebih Dahulu --</option>';
+                sel.disabled = true;
+                document.getElementById('matchup-result').innerHTML = '<p class="text-slate-400 text-center text-sm italic">Pilih musuh terlebih dahulu untuk melihat rekomendasi pelatih.</p>';
+                return;
+            }
+            
+            batters.forEach(b => {
+                sel.innerHTML += `<option value="${b.id}">${b.name} (${b.role})</option>`;
+            });
+
+            // Reset output hasil setiap kali merubah tim/pemain list
+            document.getElementById('matchup-result').innerHTML = '<p class="text-slate-400 text-center text-sm italic">Pilih musuh terlebih dahulu untuk melihat rekomendasi pelatih.</p>';
+        }
+
+        function generateMatchup() {
+            const oppId = document.getElementById('matchup-opp-select').value;
+            const resultBox = document.getElementById('matchup-result');
+            
+            if(!oppId) {
+                resultBox.innerHTML = '<p class="text-slate-400 text-center text-sm italic">Pilih musuh terlebih dahulu untuk melihat rekomendasi pelatih.</p>'; return;
+            }
+
+            const opp = opponents.find(o => o.id == oppId);
+            let recommendation = "";
+            let recommendedBowler = null;
+
+            if (opp.weaknesses.includes('spin')) {
+                const spinners = myTeam.filter(p => p.isSpin && p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
+                if(spinners.length > 0) {
+                    recommendedBowler = spinners[0];
+                    recommendation = `Gunakan <b>${recommendedBowler.name}</b>. Lawan rentan terhadap Spin, dan dia adalah spinner terhemat kita (Econ: ${calcEcon(recommendedBowler.conceded, recommendedBowler.overs)}). Pasang fielder merapat (Close-in catchers)!`;
+                } else {
+                    recommendation = "Kelemahan lawan di bola Spin, namun Anda tidak punya data Spinner yang siap. Gunakan bowler terhemat dan lempar ke arah kaki.";
+                }
+            } else if (opp.weaknesses.includes('pace') || opp.weaknesses.includes('short') || opp.weaknesses.includes('yorker')) {
+                const fastBowlers = myTeam.filter(p => p.isFast && p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
+                 if(fastBowlers.length > 0) {
+                    recommendedBowler = fastBowlers[0];
+                    recommendation = `Turunkan <b>${recommendedBowler.name}</b> (Fast Bowler). Kecepatan adalah kuncinya. Siapkan fielder di batas pinggir (Boundary) jika lemparan meleset.`;
+                } else {
+                    const bestBowlers = [...myTeam].filter(p => p.overs > 0).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs));
+                    if(bestBowlers.length > 0) {
+                        recommendation = `Kita butuh Pace Bowler, tapi data kurang. Gunakan <b>${bestBowlers[0].name}</b> sebagai tembok utama (Econ: ${calcEcon(bestBowlers[0].conceded, bestBowlers[0].overs)}). Disiplin Wicket-to-wicket!`;
+                    }
+                }
+            } else {
+                recommendation = "Kelemahan spesifik tidak membutuhkan spesialis. Gunakan Pelempar dengan Dot Ball % tertinggi Anda untuk mematikan pergerakan angkanya.";
+            }
+
+            resultBox.innerHTML = `
+                <div class="text-purple-800">
+                    <h4 class="font-bold mb-2 uppercase text-xs tracking-wider"><i class="fas fa-lightbulb text-yellow-500 mr-2 text-sm"></i>Saran Taktik Coach vs ${opp.name} (${opp.club}):</h4>
+                    <p class="text-sm leading-relaxed">${recommendation}</p>
+                </div>
+            `;
+        }
+
+        // --- INTERACTIVE FIELDING PLACEMENT ---
+        function placeFielder(event) {
+            const container = document.getElementById('fielding-map');
+            if (fieldersCount >= MAX_FIELDERS) {
+                showToast(`Batas maksimal 11 pemain di lapangan!`); return;
+            }
+
+            const rect = container.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            const xPercent = (x / rect.width) * 100;
+            const yPercent = (y / rect.height) * 100;
+
+            const dot = document.createElement('div');
+            dot.className = 'fielder-dot';
+            dot.style.left = `${xPercent}%`;
+            dot.style.top = `${yPercent}%`;
+            
+            let role = '';
+            if (fieldersCount === 0) role = "WK"; 
+            else if (fieldersCount === 1) role = "BOWL";
+            else role = `F${fieldersCount - 1}`;
+            
+            const label = document.createElement('span');
+            label.className = 'fielder-label';
+            label.innerText = role;
+            dot.appendChild(label);
+
+            container.appendChild(dot);
+            fieldersCount++;
+            document.getElementById('fielder-count').innerText = fieldersCount;
+        }
+
+        function resetFielding() {
+            const container = document.getElementById('fielding-map');
+            const dots = container.querySelectorAll('.fielder-dot');
+            dots.forEach(dot => dot.remove());
+            fieldersCount = 0;
+            document.getElementById('fielder-count').innerText = fieldersCount;
+        }
+
+        // --- LIVE CALCULATION ---
+        function calculateLiveTactic() {
+            const target = parseInt(document.getElementById('calc-target').value);
+            const current = parseInt(document.getElementById('calc-current').value);
+            const ballsLeft = parseInt(document.getElementById('calc-balls').value);
+            const wickets = parseInt(document.getElementById('calc-wickets').value);
+
+            if(isNaN(target) || isNaN(current) || isNaN(ballsLeft)) return;
+
+            const runsNeeded = target - current;
+            const oversLeft = ballsLeft / 6;
+            
+            document.getElementById('out-runs-needed').innerText = runsNeeded <= 0 ? 0 : runsNeeded;
+            document.getElementById('out-balls-needed').innerText = `dari ${ballsLeft} bola`;
+
+            if(runsNeeded <= 0) {
+                document.getElementById('out-rrr').innerText = "-";
+                document.getElementById('out-instruction').innerHTML = "<span class='text-green-400'>PERTANDINGAN SELESAI. KITA MENANG!</span>";
+                document.getElementById('out-batting-order').innerText = "-";
+                return;
+            }
+            if(ballsLeft <= 0 || wickets >= 10) {
+                document.getElementById('out-rrr').innerText = "-";
+                document.getElementById('out-instruction').innerHTML = "<span class='text-red-400'>INNINGS SELESAI.</span>";
+                document.getElementById('out-batting-order').innerText = "-";
+                return;
+            }
+
+            const rrr = runsNeeded / oversLeft;
+            document.getElementById('out-rrr').innerText = rrr.toFixed(1);
+
+            let instruction = "";
+            let colorClass = "text-white";
+            let battingOrderRec = "";
+
+            if (rrr > 10) {
+                instruction = `KRITIS! Butuh >10 run/over. Serang setiap bola lepas. Jangan takut mati!`;
+                colorClass = "text-red-400";
+                battingOrderRec = "Turunkan SLOGGER atau All-rounder agresif (Pemain dengan Strike Rate tertinggi). Kita butuh Boundary secepatnya!";
+            } else if (rrr > 7) {
+                instruction = `Agresif terkontrol. Cari 1 Boundary setiap over, sisanya rotasi lari 1-2 angka. Jangan ada Dot Ball!`;
+                colorClass = "text-yellow-400";
+                battingOrderRec = "Pertahankan susunan normal (Middle-order), namun instruksikan untuk rotasi lari di setiap lemparan.";
+            } else if (rrr > 4) {
+                instruction = `Situasi aman. Bermain tenang, rotasi strike (single runs).`;
+                colorClass = "text-green-400";
+                battingOrderRec = "Turunkan ANCHOR. Gunakan pemukul bertipe bertahan yang bisa melindungi gawang agar tidak runtuh beruntun.";
+            } else {
+                instruction = `Sangat santai. Main bertahan total (Defensive). Kemenangan di depan mata.`;
+                colorClass = "text-blue-300";
+                battingOrderRec = "Pertahankan gawang. Turunkan pemukul siapapun asalkan mereka bermain Ground Shot (bola menyusur tanah).";
+            }
+
+            if(wickets >= 7 && ballsLeft > 18) {
+                instruction += `<br><span class="text-orange-400 text-xs mt-2 block"><i class="fas fa-exclamation-triangle mr-1"></i>AWAS: Sisa gawang krisis. Utamakan bertahan!</span>`;
+                battingOrderRec = "KRISIS GAWANG! Turunkan pemain paling defensif (Anchor). Jangan sampai terkena All-out sebelum over habis.";
+            }
+
+            const instDiv = document.getElementById('out-instruction');
+            instDiv.className = `text-md font-bold leading-snug ${colorClass}`;
+            instDiv.innerHTML = instruction;
+            document.getElementById('out-batting-order').innerText = battingOrderRec;
+        }
+
+        // --- PENGEMBANGAN FITUR VIDEO ANALYSIS ---
+        function loadVideo() {
+            const url = document.getElementById('video-url').value.trim();
+            const container = document.getElementById('video-container');
+            if(!url) { showToast("Mohon masukkan link terlebih dahulu."); return; }
+            
+            // Regex YouTube yang jauh lebih fleksibel (Mendeteksi link standar, shorts, youtu.be, parameter dll)
+            const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const ytMatch = url.match(ytRegex);
+            
+            // Regex Google Drive yang lebih fleksibel (Mendeteksi file/d/ ID atau open?id= ID)
+            const driveRegex = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/;
+            const driveMatch = url.match(driveRegex);
+            
+            if (ytMatch && ytMatch[1]) {
+                const videoID = ytMatch[1];
+                // Embed frame YouTube. Parameter autoplay=1 dan rel=0 agar tidak memunculkan video random saat selesai.
+                container.innerHTML = `<iframe class="w-full h-full absolute inset-0 rounded-lg" src="https://www.youtube.com/embed/${videoID}?autoplay=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+                showToast("Video YouTube berhasil dimuat!");
+            } else if (driveMatch && driveMatch[1]) {
+                const fileID = driveMatch[1];
+                // Embed frame GDrive menggunakan fungsi preview internal GDrive.
+                container.innerHTML = `<iframe class="w-full h-full absolute inset-0 rounded-lg" src="https://drive.google.com/file/d/${fileID}/preview" frameborder="0" allow="autoplay" allowfullscreen></iframe>`;
+                showToast("Video Google Drive berhasil dimuat!");
+            } else {
+                showToast("Format link tidak dikenali. Pastikan link YouTube atau Google Drive valid.");
+            }
+        }
+
+        function saveFromVideo() {
+            const club = document.getElementById('vid-opp-club').value || 'Tanpa Klub';
+            const name = document.getElementById('vid-opp-name').value;
+            const weakness = document.getElementById('vid-opp-weakness').value;
+            
+            if(!name) { showToast("Mohon masukkan nama pemain"); return; }
+            
+            opponents.push({
+                id: Date.now(), club: club, name: name, role: "Terpantau dari Video",
+                type: "batter", weaknesses: [weakness], tendencies: []
+            });
+            
+            saveData(); 
+            document.getElementById('vid-opp-name').value = '';
+            renderOpponents();
+            populateMatchupTeamSelect();
+            populateMatchupSelect();
+            showToast("Temuan sinkron ke Database Lawan!");
+        }
+
+        // --- CHART & DASHBOARD ---
+        function updateTopPerformers() {
+            const batters = [...myTeam].filter(p => p.balls > 10).sort((a,b) => calcSR(b.runs, b.balls) - calcSR(a.runs, a.balls)).slice(0, 3);
+            const ulBat = document.getElementById('top-batters');
+            ulBat.innerHTML = '';
+            batters.forEach(b => {
+                ulBat.innerHTML += `<li class="py-2 flex justify-between"><span class="text-sm font-medium">${b.name}</span> <span class="font-bold text-blue-600 text-sm">SR ${calcSR(b.runs, b.balls)}</span></li>`;
+            });
+
+            const bowlers = [...myTeam].filter(p => p.overs >= 2).sort((a,b) => calcEcon(a.conceded, a.overs) - calcEcon(b.conceded, b.overs)).slice(0, 3);
+            const ulBowl = document.getElementById('top-bowlers');
+            ulBowl.innerHTML = '';
+            bowlers.forEach(b => {
+                ulBowl.innerHTML += `<li class="py-2 flex justify-between"><span class="text-sm font-medium">${b.name}</span> <span class="font-bold text-red-600 text-sm">Econ ${calcEcon(b.conceded, b.overs)}</span></li>`;
+            });
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('teamChart').getContext('2d');
+            const scatterData = myTeam.filter(p => p.balls > 0 && p.overs > 0).map(p => {
+                return { x: parseFloat(calcSR(p.runs, p.balls)), y: parseFloat(calcEcon(p.conceded, p.overs)), name: p.name };
+            });
+
+            if(teamChartInstance) teamChartInstance.destroy();
+
+            teamChartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{ label: 'Pemain', data: scatterData, backgroundColor: '#3b82f6', pointRadius: 6, pointHoverRadius: 8 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: { callbacks: { label: function(ctx) { return `${ctx.raw.name} (SR: ${ctx.raw.x}, Econ: ${ctx.raw.y})`; } } },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Strike Rate (Agresivitas) ⚡' }, grid: { color: '#e2e8f0' } },
+                        y: { title: { display: true, text: 'Economy Rate (Ketahanan) 🎯' }, grid: { color: '#e2e8f0' }, reverse: true }
+                    }
+                }
+            });
+        }
+
+        // --- DATA EXPORT & IMPORT MODULES (SPREADSHEET SYNC) ---
+        function downloadFile(content, filename, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 0);
+        }
+
+        function exportTeamCSV() {
+            if(myTeam.length === 0) { showToast("Tidak ada data pemain untuk diekspor"); return; }
+            let csv = "ID,Nama,Runs,Balls,Overs,Wickets,Conceded,DotBalls,IsSpin,IsFast\n";
+            myTeam.forEach(p => {
+                let safeName = `"${p.name.replace(/"/g, '""')}"`;
+                csv += `${p.id},${safeName},${p.runs},${p.balls},${p.overs},${p.wickets},${p.conceded},${p.dots},${p.isSpin},${p.isFast}\n`;
+            });
+            downloadFile(csv, "CricTactic_Spreadsheet_SkuadKita.csv", "text/csv;charset=utf-8;");
+            showToast("Berhasil membackup data Skuad (CSV Spreadsheet).");
+        }
+
+        function importTeamCSV(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                let count = 0;
+                for(let i=1; i<rows.length; i++) {
+                    if(!rows[i].trim()) continue;
+                    // Simple CSV Split handling quotes
+                    const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || rows[i].split(',');
+                    if(cols.length >= 10) {
+                        myTeam.push({
+                            id: Date.now() + i, // Generate new ID
+                            name: cols[1].replace(/"/g, ''),
+                            runs: parseInt(cols[2]) || 0,
+                            balls: parseInt(cols[3]) || 0,
+                            overs: parseFloat(cols[4]) || 0,
+                            wickets: parseInt(cols[5]) || 0,
+                            conceded: parseInt(cols[6]) || 0,
+                            dots: parseInt(cols[7]) || 0,
+                            isSpin: cols[8].trim().toLowerCase() === 'true',
+                            isFast: cols[9].trim().toLowerCase() === 'true'
+                        });
+                        count++;
+                    }
+                }
+                saveData(); 
+                renderTeamTable(); 
+                showToast(`Berhasil menarik ${count} skuad dari Spreadsheet!`);
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        function exportOpponentCSV() {
+            if(opponents.length === 0) { showToast("Tidak ada data lawan untuk diekspor"); return; }
+            let csv = "ID,Club,Name,Role,Type,Weaknesses,Tendencies\n";
+            opponents.forEach(o => {
+                let safeClub = `"${(o.club || '').replace(/"/g, '""')}"`;
+                let safeName = `"${(o.name || '').replace(/"/g, '""')}"`;
+                let safeRole = `"${(o.role || '').replace(/"/g, '""')}"`;
+                // Array di join dengan pipeline "|" agar koma tidak merusak struktur CSV
+                let safeWeaknesses = `"${(o.weaknesses || []).join('|')}"`; 
+                let safeTendencies = `"${(o.tendencies || []).join('|')}"`;
+                
+                csv += `${o.id},${safeClub},${safeName},${safeRole},${o.type},${safeWeaknesses},${safeTendencies}\n`;
+            });
+            downloadFile(csv, "CricTactic_Spreadsheet_ScoutingLawan.csv", "text/csv;charset=utf-8;");
+            showToast("Berhasil membackup data Lawan (CSV Spreadsheet).");
+        }
+
+        function importOpponentCSV(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                let count = 0;
+                for(let i=1; i<rows.length; i++) {
+                    if(!rows[i].trim()) continue;
+                    const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || rows[i].split(',');
+                    if(cols.length >= 7) {
+                        opponents.push({
+                            id: Date.now() + i,
+                            club: cols[1].replace(/"/g, '').trim(),
+                            name: cols[2].replace(/"/g, '').trim(),
+                            role: cols[3].replace(/"/g, '').trim(),
+                            type: cols[4].replace(/"/g, '').trim(),
+                            // Split kembali menggunakan pipeline "|"
+                            weaknesses: cols[5].replace(/"/g, '').trim().split('|').filter(w => w), 
+                            tendencies: cols[6].replace(/"/g, '').trim().split('|').filter(t => t)
+                        });
+                        count++;
+                    }
+                }
+                saveData(); 
+                renderOpponents(); 
+                populateMatchupTeamSelect(); 
+                populateMatchupSelect();
+                showToast(`Berhasil menarik ${count} data lawan dari Spreadsheet!`);
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        function resetData() {
+            if(confirm("PERINGATAN: Apakah Anda yakin ingin menghapus SEMUA data sesi ini secara permanen?")) {
+                myTeam = []; opponents = [];
+                saveData(); renderTeamTable(); renderOpponents(); resetFielding();
+                showToast("Data sesi berhasil dikosongkan.");
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            if(teamChartInstance && document.getElementById('view-dashboard').classList.contains('block')) {
+                teamChartInstance.resize();
+            }
+        });
+
+        // Initialize App
+        window.onload = function() {
+            loadData(); 
+            document.getElementById('opp-type').dispatchEvent(new Event('change'));
+            renderTeamTable();
+            renderOpponents();
+            calculateLiveTactic();
+            populateMatchupTeamSelect();
+            populateMatchupSelect();
+        };
+
+    </script>
+</body>
+</html> content="width=device-width, initial-scale=1.0">
     <title>CricTactic Analyst PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
