@@ -128,6 +128,7 @@
             .glass-card { box-shadow: none !important; border: 1px solid #cbd5e1 !important; break-inside: avoid; }
             section:not(.hidden) { display: block !important; }
             .hidden { display: none !important; }
+            .print-copyright { position: absolute; bottom: 10px; right: 10px; font-size: 10px; color: black !important; }
         }
     </style>
 </head>
@@ -437,16 +438,26 @@
                                 <input type="text" id="vid-opp-name" class="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-red-400 outline-none text-sm" placeholder="Contoh: Rohit S.">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-300 mb-1">Observasi Kelemahan (Temuan Cepat)</label>
-                                <select id="vid-opp-weakness" class="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-red-400 outline-none text-sm">
-                                    <option value="spin">Sangat lemah membaca putaran (Spin)</option>
-                                    <option value="short">Takut/mundur hadapi bola pantulan tinggi</option>
-                                    <option value="yorker">Gagal menahan bola tepat di kaki (Yorker)</option>
-                                    <option value="wide">Sering memancing bola jauh di luar (Wide)</option>
-                                    <option value="fulltoss">Sering melempar bola Full-toss (Untuk Bowler)</option>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Tipe Pemain</label>
+                                <select id="vid-opp-type" class="w-full p-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-red-400 outline-none text-sm">
+                                    <option value="batter">Pemukul (Batter)</option>
+                                    <option value="bowler">Pelempar (Bowler)</option>
                                 </select>
                             </div>
-                            <button onclick="saveFromVideo()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded shadow transition-colors text-sm">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Observasi Kelemahan</label>
+                                <div id="vid-opp-weakness-container" class="space-y-1 text-xs text-slate-300 max-h-32 overflow-y-auto p-2 bg-slate-700/50 border border-slate-600 rounded">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1" id="vid-label-tendency">Area Dominan</label>
+                                <div id="vid-opp-tendency-container" class="space-y-1 text-xs text-slate-300 max-h-32 overflow-y-auto p-2 bg-slate-700/50 border border-slate-600 rounded">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <button onclick="saveFromVideo()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded shadow transition-colors text-sm mt-2">
                                 <i class="fas fa-save mr-1"></i> Simpan ke Database
                             </button>
                         </div>
@@ -596,6 +607,11 @@
 
     <!-- Custom Alert/Toast -->
     <div id="toast">Notifikasi</div>
+
+    <!-- Copyright Notice -->
+    <div class="fixed bottom-2 right-4 text-[11px] text-slate-400 font-medium z-40 print-copyright opacity-80 hover:opacity-100 transition-opacity">
+        &copy; 2026 Alie Murtadho - CricTactic PRO. Hak Cipta Dilindungi.
+    </div>
 
     <script>
         // --- DATA STATE ---
@@ -1181,27 +1197,52 @@
         }
 
         // --- PENGEMBANGAN FITUR VIDEO ANALYSIS ---
+        // Populasikan pilihan Kelemahan dan Area Dominan di Video Scouting
+        document.getElementById('vid-opp-type').addEventListener('change', function(e) {
+            const type = e.target.value;
+            
+            const weakContainer = document.getElementById('vid-opp-weakness-container');
+            weakContainer.innerHTML = '';
+            weaknessDict[type].forEach(w => {
+                weakContainer.innerHTML += `
+                    <label class="flex items-center gap-2 cursor-pointer hover:text-white">
+                        <input type="checkbox" name="vid-opp-weak-check" value="${w.val}" class="rounded text-red-500 w-3 h-3 bg-slate-600 border-slate-500"> 
+                        ${w.label}
+                    </label>
+                `;
+            });
+            
+            const tendContainer = document.getElementById('vid-opp-tendency-container');
+            tendContainer.innerHTML = '';
+            tendencyDict[type].forEach(t => {
+                tendContainer.innerHTML += `
+                    <label class="flex items-center gap-2 cursor-pointer hover:text-white">
+                        <input type="checkbox" name="vid-opp-tendency-check" value="${t.val}" class="rounded text-blue-500 w-3 h-3 bg-slate-600 border-slate-500"> 
+                        ${t.label}
+                    </label>
+                `;
+            });
+            
+            document.getElementById('vid-label-tendency').innerText = type === 'batter' ? "Arah Pukulan Dominan" : "Area Lemparan Dominan";
+        });
+
         function loadVideo() {
             const url = document.getElementById('video-url').value.trim();
             const container = document.getElementById('video-container');
             if(!url) { showToast("Mohon masukkan link terlebih dahulu."); return; }
             
-            // Regex YouTube yang jauh lebih fleksibel (Mendeteksi link standar, shorts, youtu.be, parameter dll)
             const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
             const ytMatch = url.match(ytRegex);
             
-            // Regex Google Drive yang lebih fleksibel (Mendeteksi file/d/ ID atau open?id= ID)
             const driveRegex = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/;
             const driveMatch = url.match(driveRegex);
             
             if (ytMatch && ytMatch[1]) {
                 const videoID = ytMatch[1];
-                // Embed frame YouTube. Parameter autoplay=1 dan rel=0 agar tidak memunculkan video random saat selesai.
                 container.innerHTML = `<iframe class="w-full h-full absolute inset-0 rounded-lg" src="https://www.youtube.com/embed/${videoID}?autoplay=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
                 showToast("Video YouTube berhasil dimuat!");
             } else if (driveMatch && driveMatch[1]) {
                 const fileID = driveMatch[1];
-                // Embed frame GDrive menggunakan fungsi preview internal GDrive.
                 container.innerHTML = `<iframe class="w-full h-full absolute inset-0 rounded-lg" src="https://drive.google.com/file/d/${fileID}/preview" frameborder="0" allow="autoplay" allowfullscreen></iframe>`;
                 showToast("Video Google Drive berhasil dimuat!");
             } else {
@@ -1212,17 +1253,28 @@
         function saveFromVideo() {
             const club = document.getElementById('vid-opp-club').value || 'Tanpa Klub';
             const name = document.getElementById('vid-opp-name').value;
-            const weakness = document.getElementById('vid-opp-weakness').value;
+            const type = document.getElementById('vid-opp-type').value;
             
             if(!name) { showToast("Mohon masukkan nama pemain"); return; }
             
+            const weakCheckboxes = document.querySelectorAll('input[name="vid-opp-weak-check"]:checked');
+            let weaknesses = [];
+            weakCheckboxes.forEach((cb) => weaknesses.push(cb.value));
+
+            const tendCheckboxes = document.querySelectorAll('input[name="vid-opp-tendency-check"]:checked');
+            let tendencies = [];
+            tendCheckboxes.forEach((cb) => tendencies.push(cb.value));
+
             opponents.push({
                 id: Date.now(), club: club, name: name, role: "Terpantau dari Video",
-                type: "batter", weaknesses: [weakness], tendencies: []
+                type: type, weaknesses: weaknesses, tendencies: tendencies
             });
             
             saveData(); 
             document.getElementById('vid-opp-name').value = '';
+            document.querySelectorAll('input[name="vid-opp-weak-check"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('input[name="vid-opp-tendency-check"]').forEach(cb => cb.checked = false);
+
             renderOpponents();
             populateMatchupTeamSelect();
             populateMatchupSelect();
@@ -1304,7 +1356,6 @@
                 let count = 0;
                 for(let i=1; i<rows.length; i++) {
                     if(!rows[i].trim()) continue;
-                    // Simple CSV Split handling quotes
                     const cols = rows[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || rows[i].split(',');
                     if(cols.length >= 10) {
                         myTeam.push({
@@ -1337,7 +1388,6 @@
                 let safeClub = `"${(o.club || '').replace(/"/g, '""')}"`;
                 let safeName = `"${(o.name || '').replace(/"/g, '""')}"`;
                 let safeRole = `"${(o.role || '').replace(/"/g, '""')}"`;
-                // Array di join dengan pipeline "|" agar koma tidak merusak struktur CSV
                 let safeWeaknesses = `"${(o.weaknesses || []).join('|')}"`; 
                 let safeTendencies = `"${(o.tendencies || []).join('|')}"`;
                 
@@ -1365,7 +1415,6 @@
                             name: cols[2].replace(/"/g, '').trim(),
                             role: cols[3].replace(/"/g, '').trim(),
                             type: cols[4].replace(/"/g, '').trim(),
-                            // Split kembali menggunakan pipeline "|"
                             weaknesses: cols[5].replace(/"/g, '').trim().split('|').filter(w => w), 
                             tendencies: cols[6].replace(/"/g, '').trim().split('|').filter(t => t)
                         });
@@ -1399,7 +1448,10 @@
         // Initialize App
         window.onload = function() {
             loadData(); 
+            // Inisialisasi Trigger Form Dropdown Video & Lawan
             document.getElementById('opp-type').dispatchEvent(new Event('change'));
+            document.getElementById('vid-opp-type').dispatchEvent(new Event('change'));
+            
             renderTeamTable();
             renderOpponents();
             calculateLiveTactic();
